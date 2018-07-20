@@ -1,0 +1,72 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "project": {
+    "name": "training"
+  },
+  "apps": [{
+    "appRoot": "src/app",
+    "root": ".",
+    "outDir": "dist",
+    "assets": [
+        "src/app/assets"
+    ],
+    "index": "src/app/index.html",
+    "main": "src/app/main.ts",
+    "polyfills": "src/app/polyfills.ts",
+    "test": "src/app/test.ts",
+    "tsconfig": "src/app/tsconfig.app.json",
+    "testTsconfig": "src/app/tsconfig.spec.json",
+    "prefix": "app",
+    "styles": [
+      "./node_modules/sweetalert2/dist/sweetalert2.css",
+      "./node_modules/bootstrap/dist/css/bootstrap.min.css",
+      "./node_modules/font-awesome/css/font-awesome.min.css",
+      "./node_modules/ng2-toastr/bundles/ng2-toastr.min.css",
+      "./node_modules/@mt-ng2/styles/styles.min.css",
+      "src/app/styles.less"
+    ],
+    "environmentSource": "src/app/environments/environment.ts",
+    "environments": {
+      "dev": "src/app/environments/environment.ts",
+      "prod": "src/app/environments/environment.prod.ts"
+    },
+    "stylePreprocessorOptions": {
+      "includePaths": [
+        "src/app/styles/"
+      ]
+    }
+  }],
+  "e2e": {
+    "protractor": {
+      "config": "./protractor.conf.js"
+    }
+  },
+  "lint": [{
+      "project": "src/app/tsconfig.app.json",
+      "exclude": "**/node_modules/**"
+    },
+    {
+      "project": "src/app/tsconfig.spec.json",
+      "exclude": "**/node_modules/**"
+    },
+    {
+      "project": "e2e/app/tsconfig.e2e.json",
+      "exclude": "**/node_modules/**"
+    }
+  ],
+  "test": {
+    "karma": {
+      "config": "./karma.conf.js"
+    }
+  },
+  "defaults": {
+    "styleExt": "less",
+    "component": {
+      "spec": false
+    },
+    "service": {
+      "flat": false,
+      "spec": false
+    }
+  }
+}

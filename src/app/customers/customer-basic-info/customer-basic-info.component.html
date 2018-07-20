@@ -1,0 +1,21 @@
+<div class="miles-editable miles-card padded" *ngIf="!isEditing && customer.Id > 0" (mouseenter)="isHovered = true" (mouseleave)="isHovered = false"
+  (click)="edit()" [style.cursor]="canEdit ? 'pointer' : 'default'">
+  <h4>Customer Info
+    <span class="pull-right" *ngIf="canEdit" [hidden]="!isHovered">
+      <i class="fa fa-lg fa-edit"></i>
+    </span>
+  </h4>
+  <app-dynamic-view [config]="config.viewOnly"></app-dynamic-view>
+</div>
+<div *ngIf="isEditing" class="miles-form padded">
+  <h4>Customer Info</h4>
+  <app-dynamic-form [config]="config.formObject" ([isEditing])="isEditing" (submitted)="formSubmitted($event)">
+    <button type="submit" mt-doubleClickDisabled [(doubleClickIsDisabled)]="doubleClickIsDisabled" Class="btn btn-flat btn-success">
+      Save
+    </button>
+    <button type="button" Class="btn btn-flat btn-default" (click)="cancelClick()">
+      Cancel
+    </button>
+
+  </app-dynamic-form>
+</div>

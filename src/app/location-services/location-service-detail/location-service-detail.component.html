@@ -1,0 +1,86 @@
+<div class="row">
+        <h1>{{title}}</h1>
+    <div *ngIf="locationSelected" class="col-md-6">
+        <h2> Select Service for {{setLocation}} </h2>
+        <button (click)="clearLocation()">Change Location</button>
+        <br>
+        <br>
+    </div>
+    <div *ngIf="!locationSelected" class="col-md-6">
+        <h2>Select a Location</h2>
+        <ng-template #rt let-r="result" class="btn-success" let-t="term">
+            {{r.Name}}
+        </ng-template>
+        <label for="typeahead-location">List of Available Locations for a Customer:</label>
+        <input id="typeahead-location" #inputLocation type="text" class="form-control" [(ngModel)]="model" [ngbTypeahead]="searchLocations"
+            [resultTemplate]="rt" [inputFormatter]="formatter" (selectItem)="selectedLocation($event, inputLocation)" />
+        <p>Please enter the location name.</p>
+        <hr>
+    </div>
+    <div *ngIf="showTotal" class="col-md-6">
+        <h2>Selected Services</h2>
+        <ul>
+            <li *ngFor="let locationServices of listOfServicesForLocation" (click)="deleteItemFromList(locationServices)">
+                <button>{{locationServices.Good.Name}} Service, click on me to delete.</button>
+            </li>
+        </ul>
+        <h2>Total: {{TotalPrice | currency}}</h2>
+    </div>
+</div>
+<div class="row">
+    <div *ngIf="locationSelected" class="col-md-6">
+
+        <ng-template #rt let-r="result" class="btn-success" let-t="term">
+            {{r.Name}}
+        </ng-template>
+        <label for="typeahead-service">List of Available Services for a Customer:</label>
+        <input id="typeahead-service" #inputService type="text" class="form-control" [(ngModel)]="model" [ngbTypeahead]="searchServices"
+            [resultTemplate]="rt" [inputFormatter]="formatter" (selectItem)="selectedService($event, inputService)" />
+        <br>
+        <br>
+        <div *ngIf="serviceSelected" class="miles-card padded">
+            <h4>{{currentService.Name}}</h4>
+            <form [formGroup]="descriptionForm">
+                <div class="form-group">
+                    <label class="center-block">Short Description:
+                        <textarea class="form-control" formControlName="shortDescription"></textarea>
+                    </label>
+                    <label class="center-block">Long Description:
+                        <textarea class="form-control" formControlName="longDescription"></textarea>
+                    </label>
+                    <div class="checkbox">
+                        <label class="center-block">
+                            <input type="checkbox" formControlName="ifTaxableField">Taxable/Non Taxable:
+                        </label>
+                    </div>
+                    <label class="center-block">
+                        Unit:                      
+                        {{unit}}
+                    </label>
+                    <label class="center-block">
+                        Cost:                      
+                        {{currentServiceCost | currency}}
+                    </label>
+                    <label class="center-block">
+                        Quantity:
+                        <input class="form-control" type="number" min="1" max = "99" step="1" formControlName="quantity">
+                    </label>
+                    <label class="center-block">
+                        Price in $:
+                        <input class="form-control" type="number" min={{currentServiceCost}} step="0.01" formControlName="priceField">
+                    </label>
+                    <label class="center-block">
+                        Tax if aplicable:                      
+                        {{CalculatedTax | currency}}
+                    </label>
+                    <label class="form-control" class="center-block">
+                        Total for one Service:             
+                        {{TotalLineItem | currency}}
+                    </label>
+
+                </div>
+                <button type="button" (click)="checkPricePermissions()">Add Service</button>
+            </form>
+        </div>
+    </div>
+</div>

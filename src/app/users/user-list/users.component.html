@@ -1,0 +1,18 @@
+<div class="row">
+  <div class="col-md-7">
+    <h2>Users</h2>
+  </div>
+</div>
+<div>
+    <mt-search-bar (onSearch)="search($event)"></mt-search-bar>
+    <br>
+</div>
+<entity-list [entities]="users" [total]="total" [(currentPage)]="currentPage" (onPageChanged)="getUsers()"
+    (onItemSelected)="userSelected($event)" [entityListConfig]="entityListConfig">
+</entity-list>
+
+<div *ngIf="canAddUser" class="fab-wrap-b-r">
+  <a class="btn btn-primary btn-fab-lg" [routerLink]="['/users', 'add']">
+    <span class="fa fa-plus"></span>
+  </a>
+</div>

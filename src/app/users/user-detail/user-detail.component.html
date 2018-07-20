@@ -1,0 +1,41 @@
+<div *ngIf="myProfile" class="row">
+  <div class="col-md-7">
+    <h2>My Profile</h2>
+  </div>
+</div>
+<div *ngIf="user && user.Id > 0">
+  <div class="row">
+    <div class="col-md-6">
+      <app-user-basic-info [user]="user" [canEdit]="canEdit"></app-user-basic-info>
+      <br>
+      <app-auth-user-portal-access *ngIf="user.Id !== currentUser.Id" [AuthUser]="user.AuthUser" [canEdit]="canEdit" (updateVersion)="updateVersion($event)"></app-auth-user-portal-access>
+      <br>
+      <app-auth-user-password [AuthUser]="user.AuthUser" [canEdit]="canEdit" (updateVersion)="updateVersion($event)"></app-auth-user-password>
+    </div>
+    <div class="col-md-6">
+      <app-user-photo [user]="user" [canEdit]="canEdit"></app-user-photo>
+      <br>
+      <app-common-addresses [canEdit]="canEdit" [address]="userAddress"
+      (onSave)="saveAddress($event)" (onDelete)="deleteAddress($event)"></app-common-addresses>
+      <br>
+      <app-common-phone [PhoneArray]="user.UserPhones" (onSave)=savePhones($event) [canEdit]="canEdit"></app-common-phone>
+      <br>
+      <div class="miles-card padded">
+        <h4>Service Areas</h4>
+        <select class="form-control ng-pristine ng-valid ng-touched" multiple="" ng-reflect-name="ServiceAreas">
+          <option *ngFor="let serviceArea of serviceAreas">{{serviceArea.Name}}</option>>
+        </select>
+        <br>
+        <button (click)="saveServiceAreas()">Save</button>
+      </div>
+    </div>
+  </div>
+  <a routerLink="/users" class="btn btn-default">Close</a>
+</div>
+<div *ngIf="user && user.Id === 0">
+  <div class="row">
+    <div class="col-md-6">
+      <app-user-basic-info [user]="user"></app-user-basic-info>
+    </div>
+  </div>
+</div>

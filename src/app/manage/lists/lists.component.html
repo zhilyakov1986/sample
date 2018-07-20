@@ -1,0 +1,19 @@
+<h2>Manage List Items</h2>
+<div>
+    <div class="row">
+        <div class="col-md-6">
+            <meta-item-managed-list [service]="serviceAreaService" [dynamicForm]="serviceAreaDynamicForm" [canAdd]="true" [canRemove]="true"></meta-item-managed-list>
+            <br/>
+        </div>
+        <div class="col-md-6">
+            <meta-item-managed-list [service]="serviceDivisionService" [dynamicForm]="serviceDivisionDynamicForm" [canAdd]="true" [canRemove]="true"></meta-item-managed-list>
+            <br/>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6">
+            <meta-item-managed-list [service]="unitTypeService" [dynamicForm]="unitTypeDynamicForm" [canAdd]="true" [canRemove]="true"></meta-item-managed-list>
+            <br/>
+        </div>
+    </div>
+</div>

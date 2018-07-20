@@ -1,0 +1,20 @@
+<div *ngIf="good && good.Id > 0">
+  <div class="row">
+    <div class="col-md-6">
+      <app-good-basic-info [good]="good" [canEdit]="canEdit"></app-good-basic-info>
+      <br>
+    </div>
+    <div class="col-md-6">
+      <app-common-documents [canEdit]="canEdit"></app-common-documents>
+      <br>
+    </div>
+  </div>
+  <a routerLink="/goods" class="btn btn-default">Close</a>
+</div>
+<div *ngIf="good && good.Id === 0">
+  <div class="row">
+    <div class="col-md-6">
+      <app-good-basic-info [good]="good"></app-good-basic-info>
+    </div>
+  </div>
+</div>

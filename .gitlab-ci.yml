@@ -1,0 +1,1059 @@
+variables:
+  Solution: Training.sln
+  MSBUILDFolder: "/MSBUILD/15.0/Bin/"
+  SQLMSBUILDFolder: "/MSBUILD/14.0/Bin/"
+  DB_NAME: "Training.SQL"
+  SQLProjFile: 'SQL.sqlproj'
+  DEV_API_PORT: "9098"
+  DEV_NGINX_PORT: "80"
+  DEV_HOST_NAME: "training.testing.milesapp.com"
+  DEV_API_SERVER: "192.168.2.132"    #
+  DEV_DB_SERVER_WITHDOMAIN: "test-sql2014a.miles.office"
+  DEV_DB_SERVER: "test-sql2014a"
+  STAGING_API_PORT: "9002"
+  STAGING_NGINX_PORT: "80"
+  STAGING_HOST_NAME: "annapurna.staging.milesapp.com"
+  STAGING_API_SERVER: "192.168.223.20"
+  PROD_API_PORT: "9002"
+  PROD_NGINX_PORT: "80"
+  PROD_HOST_NAME: "annapurna.production.milesapp.com"
+  PROD_API_SERVER: "192.168.237.20"
+  LETSENCRYPT_EMAIL: "jbaig@4miles.com"
+  LETSENCRYPT_TEST: "false"
+  #####
+  # These should not need to change unless hosted outside the DMZ
+  #####
+  DEV_API_DNS: "192.168.2.11"
+  DEV_API_DNS_SEARCH: "miles-dc01.miles.office"
+  #####
+  PROD_API_DNS: "192.168.222.2"
+  PROD_API_DNS_SEARCH: "dmz-dc01.dmz.local"
+  #####
+
+stages:
+  - test
+  - backup
+  - backup-cleanup
+  - build
+  - dockerbuild
+  - review-presetup
+  - review-startdb
+  - deploy
+  - cleanup
+
+ #############  Testing Stages   ################
+.testapi: &testapi
+  script:
+  - $MSBUILDPath = Join-Path ${env:ProgramFiles(x86)} ${env:MSBUILDFolder}
+  - $MSBUILDPath = Join-Path $MSBUILDPath msbuild.exe
+  - iex '& $MSBUILDPath "${env:Solution}" /clp:ErrorsOnly /nr:false /m /p:Configuration=${env:ConfigurationType} /p:Platform="Any CPU"'
+#  - dir /s /b *.Tests.dll | findstr /r Tests\\*\\bin\\ > testcontainers.txt
+#  - echo 'for /f %%f in (testcontainers.txt) do "packages\NUnit.ConsoleRunner.3.2.1\tools\nunit3-console.exe" "%%f"'
+#  - 'for /f %%f in (testcontainers.txt) do "packages\NUnit.ConsoleRunner.3.2.1\tools\nunit3-console.exe" "%%f"'
+
+testapi-dev:
+  <<: *testapi
+  stage: test
+  variables:
+    ConfigurationType: "Testing"
+  tags:
+    - winbuild01
+  only:
+  - develop
+
+testapi-staging:
+  <<: *testapi
+  stage: test
+  variables:
+    ConfigurationType: "Production"
+  tags:
+    - win
+    - localdb
+  only:
+  - staging
+
+testapi-prod:
+  <<: *testapi
+  stage: test
+  before_script:
+  - IF "%PROD_CNSTRING%"=="" error
+  - IF "%PROD_DBUSER%"=="" error
+  - IF "%PROD_DBPASS%"=="" error
+  - IF "%PROD_DB_SERVER%"=="" error
+  - IF "%PROD_DB_SERVER_WITHDOMAIN%"=="" error
+  variables:
+    ConfigurationType: "Production"
+  tags:
+    - win
+    - localdb
+  only:
+  - master
+  - review
+  - /^hotfix.*$/
+
+############   Backup Database
+.backupdb: &backupdb
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - SqlCmd -E -S %ServerName% -Q "BACKUP DATABASE [%DatabaseName%] to DISK = N'%CI_PROJECT_DIR%/ReviewDB.bak'"
+
+backupdb-demo:
+  <<: *backupdb
+  stage: backup
+  variables:
+    DatabaseName: $DB_NAME
+    ServerName: $DEV_DB_SERVER
+    GIT_STRATEGY: none
+  only:
+  - /^demo.*$/
+  - /^hotfix.*$/
+  tags:
+    - test-sql2014a
+  artifacts:
+    paths:
+      - ReviewDB.bak
+    expire_in: 2 hrs
+
+backupdb-review:
+  <<: *backupdb
+  stage: backup
+  variables:
+    DatabaseName: $DB_NAME
+    ServerName: $PROD_DB_SERVER
+    GIT_STRATEGY: none
+  only:
+  - review
+  - securityscan
+  - /^hotfix.*$/
+  tags:
+    - miles-sql2014a
+  artifacts:
+    paths:
+      - ReviewDB.bak
+    expire_in: 2 hrs
+
+############   Backup Database Cleanup (Make sure not to keep lots of backup files)
+.backupdbcleanup: &backupdbcleanup
+  script:
+    - del *.* /Q
+
+backupdbcleanup-demo:
+  <<: *backupdbcleanup
+  stage: backup-cleanup
+  variables:
+    GIT_STRATEGY: none
+  only:
+  - /^demo.*$/
+  - /^hotfix.*$/
+  tags:
+    - test-sql2014a
+
+backupdbcleanup-review:
+  <<: *backupdbcleanup
+  stage: backup-cleanup
+  variables:
+    GIT_STRATEGY: none
+  only:
+  - review
+  - /^hotfix.*$/
+  tags:
+    - miles-sql2014a
+
+#############  Building Stage - Development Windows API  ################
+.buildapi: &buildapi
+  script:
+  - (Get-Content .\src\API\App.${env:ConfigurationType}.config).replace('[[URL_HOST_NAME]]', "${env:URL_HOST_NAME}").replace('[[connectionstring]]', "${env:ConnectionString}") | Set-Content .\src\API\App.${env:ConfigurationType}.config
+  - echo building...
+  - $MSBUILDPath = Join-Path ${env:ProgramFiles(x86)} ${env:MSBUILDFolder}
+  - $MSBUILDPath = Join-Path $MSBUILDPath msbuild.exe
+  - iex '& $MSBUILDPath "${env:Solution}" /clp:ErrorsOnly /nr:false /m /p:Configuration=${env:ConfigurationType} /p:Platform="Any CPU"'
+  - cd src/API
+  - docker login --username "${env:Docker_User_Name}" --password "${env:Docker_Password}" ${env:CI_REGISTRY}
+  - docker build --pull --build-arg NewRelicKey=${env:NewRelicKey} -t "${env:IMAGENAME}" ${env:APIDockerfile} .
+  - echo  "${env:IMAGENAME}"
+  - docker push "${env:IMAGENAME}"
+  - cd ../../
+
+buildapi-dev:win:
+  <<: *buildapi
+  stage: build
+  variables:
+    ConfigurationType: "Testing"
+    IMAGENAME: "$CI_REGISTRY_IMAGE:api_$CI_COMMIT_REF_NAME"
+    URL_HOST_NAME: "$DEV_HOST_NAME"
+    ConnectionString: "$TEST_CNSTRING"
+  tags:
+  - winbuild01
+  only:
+  - develop
+  artifacts:
+    paths:
+      - docker-composeapi.yml
+      - docker-composefe.yml
+
+buildapi-demo:win:
+  <<: *buildapi
+  stage: build
+  before_script:
+    - (Get-Content .\src\API\App.Review.config).replace('[[branch]]', "${env:URL_HOST_NAME}") | Set-Content .\src\API\App.Review.config
+  variables:
+    ConfigurationType: "Review"
+    IMAGENAME: "$CI_REGISTRY_IMAGE:api_$CI_COMMIT_REF_NAME"
+    URL_HOST_NAME: "http://$CI_COMMIT_REF_NAME-$DEV_HOST_NAME"
+    ConnectionString: "$REVIEW_CNSTRING"
+  tags:
+  - windocker
+  only:
+  - /^demo.*$/
+  - /^hotfix.*$/
+  artifacts:
+    paths:
+      - docker-composeapi.yml
+      - docker-composefe.yml
+    expire_in: 2 hrs
+
+buildapi-staging:win:
+  <<: *buildapi
+  stage: build
+  variables:
+    ConfigurationType: "Staging"
+    IMAGENAME: "$CI_REGISTRY_IMAGE:api_$CI_COMMIT_REF_NAME"
+    ConnectionString: "$STAGE_CNSTRING"
+    URL_HOST_NAME: "$STAGING_HOST_NAME"
+  tags:
+  - windocker
+  only:
+  - staging
+  artifacts:
+    paths:
+      - docker-composeapi.yml
+      - docker-composefe.yml
+      - docker-composefelencrypt.yml
+
+buildapi-review:win:
+  <<: *buildapi
+  stage: build
+  before_script:
+    - (Get-Content .\src\API\App.Production.config).replace('[[connectionstring]]', "${env:ConnectionString}") | Set-Content .\src\API\App.Production.config
+    - $configsettings = (Get-Content ${env:CI_PROJECT_DIR}\src\API\App.Production.config) -as [Xml]
+    - $updatesetting = $configsettings.configuration.appSettings.add | where {$_.Key -eq 'AdminSite'}
+    - $updatesetting.value = "${env:AdminSiteValue}"
+    - $configsettings.Save("${env:CI_PROJECT_DIR}\src\API\App.Production.config")
+  variables:
+    ConfigurationType: "Production"
+    IMAGENAME: "$CI_REGISTRY_IMAGE:api_$CI_COMMIT_REF_NAME"
+    ConnectionString: "$REVIEW_CNSTRING"
+    AdminSiteValue: "https://$CI_COMMIT_REF_NAME-$PROD_HOST_NAME"
+    URL_HOST_NAME: "$CI_COMMIT_REF_NAME-$PROD_HOST_NAME"
+  tags:
+  - windocker
+  only:
+  - review
+  artifacts:
+    paths:
+      - docker-composeapi.yml
+      - docker-composefe.yml
+      - docker-composefelencrypt.yml
+
+buildapi-hotfix:win:
+  <<: *buildapi
+  stage: build
+  before_script:
+    - (Get-Content .\src\API\App.Production.config).replace('[[connectionstring]]', "${env:ConnectionString}") | Set-Content .\src\API\App.Production.config
+    - $configsettings = (Get-Content ${env:CI_PROJECT_DIR}\src\API\App.Production.config) -as [Xml]
+    - $updatesetting = $configsettings.configuration.appSettings.add | where {$_.Key -eq 'AdminSite'}
+    - $updatesetting.value = "${env:AdminSiteValue}"
+    - $configsettings.Save("${env:CI_PROJECT_DIR}\src\API\App.Production.config")
+  variables:
+    ConfigurationType: "Production"
+    IMAGENAME: "$CI_REGISTRY_IMAGE:api_$CI_COMMIT_REF_NAME"
+    ConnectionString: "Data Source=testsqlcopy;Initial Catalog=Annapurna.SQL;Pooling=False;Connect Timeout=30;user id=sa;PWD=Testsepass123;"
+    AdminSiteValue: "https://$CI_COMMIT_REF_NAME-$STAGING_HOST_NAME"
+    URL_HOST_NAME: "$CI_COMMIT_REF_NAME-$STAGING_HOST_NAME"
+  tags:
+  - windocker
+  only:
+  - /^hotfix.*$/
+  artifacts:
+    paths:
+      - docker-composeapi.yml
+      - docker-composefe.yml
+      - docker-composefelencrypt.yml
+
+buildapi-securityscan:win:
+  <<: *buildapi
+  stage: build
+  before_script:
+    - (Get-Content .\src\API\App.Security.config).replace('[[connectionstring]]', "${env:ConnectionString}") | Set-Content .\src\API\App.Security.config
+    - $configsettings = (Get-Content ${env:CI_PROJECT_DIR}\src\API\App.Security.config) -as [Xml]
+    - $updatesetting = $configsettings.configuration.appSettings.add | where {$_.Key -eq 'AdminSite'}
+    - $updatesetting.value = "${env:AdminSiteValue}"
+    - $configsettings.Save("${env:CI_PROJECT_DIR}\src\API\App.Security.config")
+  variables:
+    ConfigurationType: "Security"
+    IMAGENAME: "$CI_REGISTRY_IMAGE:api_$CI_COMMIT_REF_NAME"
+    ConnectionString: "$REVIEW_CNSTRING"
+    AdminSiteValue: "https://$CI_COMMIT_REF_NAME-$STAGING_HOST_NAME"
+    URL_HOST_NAME: "$CI_COMMIT_REF_NAME-$STAGING_HOST_NAME"
+  tags:
+  - windocker
+  only:
+  - securityscan
+  artifacts:
+    paths:
+      - docker-composeapi.yml
+      - docker-composefe.yml
+      - docker-composefelencrypt.yml
+
+buildapi-prod:win:
+  <<: *buildapi
+  stage: build
+  before_script:
+    - $configsettings = (Get-Content ${env:CI_PROJECT_DIR}\src\API\App.Production.config) -as [Xml]
+    - $updatesetting = $configsettings.configuration.appSettings.add | where {$_.Key -eq 'AdminSite'}
+    - $updatesetting.value = "${env:AdminSiteValue}"
+    - $configsettings.Save("${env:CI_PROJECT_DIR}\src\API\App.Production.config")
+  variables:
+    ConfigurationType: "Production"
+    IMAGENAME: "$CI_REGISTRY_IMAGE:api_$CI_COMMIT_REF_NAME-$CI_PIPELINE_ID"
+    ConnectionString: $PROD_CNSTRING
+    AdminSiteValue: "https://$PROD_HOST_NAME"
+    APIDockerfile: "-fDockerfileNR"
+  tags:
+  - windocker
+  only:
+  - master
+  artifacts:
+    paths:
+      - docker-composeapi.yml
+      - docker-composefe.yml
+      - docker-composefelencrypt.yml
+
+#############  Building Stage - When Tagging a Project Windows API  ################
+buildapi-tags:win:
+  <<: *buildapi
+  stage: build
+  variables:
+    ConfigurationType: "Production"
+    IMAGENAME: "$CI_REGISTRY_IMAGE:api_$CI_COMMIT_REF_NAME"
+  tags:
+  - windocker
+  only:
+  - tags
+
+#############  Building Stage - Front-End Linux  ################
+.buildfe: &buildfe
+  image: "$CI_REGISTRY_IMAGE:miles-febuild"
+  script:
+    - mkdir -p $CI_PROJECT_DIR/src/head/
+    - echo $NewRelicCode > $CI_PROJECT_DIR/src/head/newrelic.html
+    - npm config set registry https://vanir.rmm.milesapp.com/repository/milesnpm-group/
+    - echo "$Docker_Private_Registry" >> ~/.npmrc
+    - echo "$Docker_Public_Registry" >> ~/.npmrc
+    - npm run build
+    - find dist/ -maxdepth 1 -type f -exec cp '{}' dist/src/app/ \;
+    - find dist/ -maxdepth 1 -type f -exec rm '{}' \;
+
+buildfe:linux-master:
+  <<: *buildfe
+  stage: build
+  tags:
+    - docker
+    - linux
+  only:
+    - master
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME"
+    paths:
+      - node_modules/
+  artifacts:
+    paths:
+      - dist/
+      - docker-composeapi.yml
+      - docker-composefe.yml
+      - docker-composefelencrypt.yml
+      - FEDockerfile
+      - deploy/nginx.template
+
+buildfe:linux-all:
+  <<: *buildfe
+  stage: build
+  variables:
+    NewRelicCode: ""
+  tags:
+    - docker
+    - linux
+  except:
+    - master
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME"
+    paths:
+      - node_modules/
+      - bower_components/
+  artifacts:
+    paths:
+      - dist/
+      - docker-composeapi.yml
+      - docker-composefe.yml
+      - docker-composefelencrypt.yml
+      - FEDockerfile
+      - deploy/nginx.template
+    expire_in: 2 hrs
+
+#############  Building Stage  - Front-End Docker Image  ################
+###     NOTE: Separated out from FE Build Stage to use a different docker image "image: docker:latest"
+.dockerfe: &dockerfe
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - export IMAGE_TAG=$(echo -en $CI_COMMIT_REF_NAME | tr -c '[:alnum:]_.-' '-')
+    - docker login --username "$Docker_User_Name" --password "$Docker_Password" $CI_REGISTRY
+    - docker build --pull -t "$CI_REGISTRY_IMAGE:fe_$IMAGE_TAG$EXTRATAG" -f FEDockerfile .
+    - docker push "$CI_REGISTRY_IMAGE:fe_$IMAGE_TAG$EXTRATAG"
+
+dockerfe-dev:linux:
+  <<: *dockerfe
+  stage: dockerbuild
+  variables:
+    EXTRATAG: ""
+  except:
+    - master
+  tags:
+    - docker
+    - linux
+    - dind
+
+dockerfe-master:linux:
+  <<: *dockerfe
+  stage: dockerbuild
+  variables:
+    EXTRATAG: "-$CI_PIPELINE_ID"
+  only :
+    - master
+  tags:
+    - docker
+    - linux
+    - dind
+
+#############  Review Pre Setup Stage  - Clear out any docker comtainers that still exist for reviewing  ################
+.presetup: &presetup
+  script:
+    - iex '@(docker ps -a | sls "${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME}") | %{docker stop ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME}}'
+    - iex '@(docker ps -a | sls "${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_api_${env:CI_COMMIT_REF_NAME}") | %{docker stop ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_api_${env:CI_COMMIT_REF_NAME}}'
+    - iex '@(docker ps -a | sls "${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_sqlpublish_${env:CI_COMMIT_REF_NAME}") | %{docker stop ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_sqlpublish_${env:CI_COMMIT_REF_NAME}}'
+    - iex '@(docker ps -a | sls "${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_sqlpublish_${env:CI_COMMIT_REF_NAME}") | %{docker rm ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_sqlpublish_${env:CI_COMMIT_REF_NAME}}'
+  allow_failure: true
+
+presetup-demo:
+  <<: *presetup
+  stage: review-presetup
+  variables:
+    GIT_STRATEGY: none
+  only:
+    - /^demo.*$/
+    - /^hotfix.*$/
+  tags:
+    - test-api01
+    - pshell
+
+presetup-staging:
+  <<: *presetup
+  stage: review-presetup
+  variables:
+    GIT_STRATEGY: none
+  only:
+    - securityscan
+    - /^hotfix.*$/
+  tags:
+    - stagingapi01
+
+presetup-review:
+  <<: *presetup
+  stage: review-presetup
+  variables:
+    GIT_STRATEGY: none
+  only:
+    - review
+  tags:
+    - prod-api01
+
+#############  Review Start DB Stage  - Starts a SQL 2016 Container and copies the backup file to it  ################
+.startdb: &startdb
+  script:
+    - docker login --username "${env:Docker_User_Name}" --password "${env:Docker_Password}" ${env:CI_REGISTRY}
+    - docker run -d --rm --name ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME} --expose 1433  -e sa_password=Testsepass123 -e ACCEPT_EULA=Y microsoft/mssql-server-windows-developer:2016-sp1-windowsservercore-10.0.14393.693
+    - docker cp .\ReviewDB.bak ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME}:C:\
+
+startdb-demo:
+  <<: *startdb
+  stage: review-startdb
+  variables:
+    GIT_STRATEGY: none
+  only:
+    - /^demo.*$/
+    - /^hotfix.*$/
+  tags:
+    - test-api01
+    - pshell
+
+startdb-staging:
+  <<: *startdb
+  stage: review-startdb
+  variables:
+    GIT_STRATEGY: none
+  only:
+    - securityscan
+    - /^hotfix.*$/
+  tags:
+    - stagingapi01
+
+startdb-review:
+  <<: *startdb
+  stage: review-startdb
+  variables:
+    GIT_STRATEGY: none
+  only:
+    - review
+  tags:
+    - prod-api01
+
+#############  Deploy Stage - Development Windows API  ################
+.deployapi: &deployapi
+  variables:
+    GIT_STRATEGY: none
+  script:
+  - echo "#Environment Variables" | out-file -encoding utf8 .env
+  - echo "ImageName=${env:CI_REGISTRY_IMAGE}" | out-file -encoding utf8 .env -Append
+  - echo "ImageTag=${env:IMAGETAG}" | out-file -encoding utf8 .env -Append
+  - echo "USEPORT=${env:API_PORT}" | out-file -encoding utf8 .env -Append
+  - echo "DNS=${env:DNS}" | out-file -encoding utf8 .env -Append
+  - echo "DNS_SEARCH=${env:DNS_SEARCH}" | out-file -encoding utf8 .env -Append
+  - docker login --username "${env:Docker_User_Name}" --password "${env:Docker_Password}" ${env:CI_REGISTRY}
+  - docker-compose -f docker-composeapi.yml pull
+  - docker-compose -f docker-composeapi.yml --project-name ${env:FULL_PROJECT_NAME} up -d
+
+deployapi-dev:win:
+  <<: *deployapi
+  stage: deploy
+  variables:
+    IMAGETAG: "api_$CI_COMMIT_REF_NAME"
+    API_PORT: "$DEV_API_PORT"
+    DNS: "$DEV_API_DNS"
+    DNS_SEARCH: "$DEV_API_DNS_SEARCH"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME"
+  tags:
+  - pshell
+  - test-api01
+  only:
+  - develop
+
+deployapi-staging:win:
+  <<: *deployapi
+  stage: deploy
+  variables:
+    IMAGETAG: "api_$CI_COMMIT_REF_NAME"
+    API_PORT: "$STAGING_API_PORT"
+    DNS: "$DEV_API_DNS"
+    DNS_SEARCH: "$DEV_API_DNS_SEARCH"
+    FULL_PROJECT_NAME: $CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME
+  tags:
+  - stagingapi01
+  only:
+  - staging
+
+deployapi-prod:win:
+  <<: *deployapi
+  stage: deploy
+  variables:
+    IMAGETAG: "api_$CI_COMMIT_REF_NAME-$CI_PIPELINE_ID"
+    API_PORT: "$PROD_API_PORT"
+    DNS: "$PROD_API_DNS"
+    DNS_SEARCH: "$PROD_API_DNS_SEARCH"
+    FULL_PROJECT_NAME: $CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME
+  environment:
+    name: ProductionAPI
+  tags:
+  - prod-api01
+  only:
+  - master
+
+.deployreviewsetup: &deployreviewsetup
+  script:
+    - (Get-Content .\src\SQL\${env:ReviewFile}).replace('[[connectionstring]]', "${env:ConnectionString}") | Set-Content .\src\SQL\${env:ReviewFile}
+    - docker login --username "${env:Docker_User_Name}" --password "${env:Docker_Password}" ${env:CI_REGISTRY}
+    - docker pull ${env:CI_REGISTRY_IMAGE}:${env:IMAGETAG}
+    - docker run --rm --link ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME} --dns ${env:DNS} --dns-search ${env:DNS_SEARCH} registry.staging.milesapp.com:5000/engineering/mssqlcopy:master CopyDB.cmd ${env:DB_SERVER} ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME} ${env:DB_NAME} ${env:DB_USER} ${env:DB_PW} sa Testsepass123
+    - docker run -d --rm --link ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME} --name ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_api_${env:CI_COMMIT_REF_NAME} -p ${env:API_PORT}:9001 -v ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_docs:C:\docs ${env:CI_REGISTRY_IMAGE}:${env:IMAGETAG}
+    - $sqlip = docker inspect --format "{{.NetworkSettings.Networks.nat.IPAddress}}" ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME}
+    - docker exec ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_api_${env:CI_COMMIT_REF_NAME} cmd /c "echo $sqlip   testsqlcopy >> C:\Windows\System32\drivers\etc\hosts"
+    - docker run -dit --rm --link ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME} --name ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_sqlpublish_${env:CI_COMMIT_REF_NAME} -v ${env:CI_PROJECT_DIR}\src\SQL:C:\code registry.staging.milesapp.com:5000/engineering/msbuild14:master
+    - docker exec ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_sqlpublish_${env:CI_COMMIT_REF_NAME} cmd /c "echo $sqlip   testsqlcopy >> C:\Windows\System32\drivers\etc\hosts"
+    - docker exec ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_sqlpublish_${env:CI_COMMIT_REF_NAME} powershell "./msbuild C:\code\${env:SQLProjFile} /t:build /t:publish /p:Configuration=Production /m /p:Platform='Any CPU' /p:SqlPublishProfilePath=C:\code\${env:ReviewFile} "
+    - docker exec ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_sqlpublish_${env:CI_COMMIT_REF_NAME} powershell 'Get-ChildItem C:\code -include bin,obj -Recurse | foreach ($_) { remove-item $_.fullname -Force -Recurse }'
+    - docker stop ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_sqlpublish_${env:CI_COMMIT_REF_NAME}
+
+setup-demo:
+  <<: *deployreviewsetup
+  stage: deploy
+  environment:
+    name: review-api/$CI_COMMIT_REF_NAME
+    on_stop: stop_review_app
+  variables:
+    IMAGETAG: "api_$CI_COMMIT_REF_NAME"
+    API_PORT: "$CI_PIPELINE_ID"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME"
+    DB_SERVER: "$DEV_DB_SERVER_WITHDOMAIN"
+    DB_USER: "sa_Annapurna"
+    DB_PW: "sa_Annapurna"
+    ReviewFile: "reviewbranch.publish.xml"
+    ConnectionString: "$REVIEW_CNSTRING"
+    DNS: "$DEV_API_DNS"
+    DNS_SEARCH: "$DEV_API_DNS_SEARCH"
+  only:
+    - /^demo.*$/
+    - /^hotfix.*$/
+  tags:
+    - test-api01
+    - pshell
+
+setup-securityscan:
+  <<: *deployreviewsetup
+  stage: deploy
+  environment:
+    name: review-api/$CI_COMMIT_REF_NAME
+    on_stop: stop_staging_app
+  variables:
+    IMAGETAG: "api_$CI_COMMIT_REF_NAME"
+    API_PORT: "$CI_PIPELINE_ID"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME"
+    DB_SERVER: "$PROD_DB_SERVER_WITHDOMAIN"
+    DB_USER: "$PROD_DBUSER"
+    DB_PW: "$PROD_DBPASS"
+    ReviewFile: "review.publish.xml"
+    ConnectionString: "$REVIEW_CNSTRING"
+    DNS: "$PROD_API_DNS"
+    DNS_SEARCH: "$PROD_API_DNS_SEARCH"
+  only:
+    - securityscan
+    - /^hotfix.*$/
+  tags:
+    - stagingapi01
+
+setup-review:
+  <<: *deployreviewsetup
+  stage: deploy
+  environment:
+    name: review-api/$CI_COMMIT_REF_NAME
+    on_stop: stop_review_app
+  variables:
+    IMAGETAG: "api_$CI_COMMIT_REF_NAME"
+    API_PORT: "$CI_PIPELINE_ID"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME"
+    DB_SERVER: "$PROD_DB_SERVER_WITHDOMAIN"
+    DB_USER: "$PROD_DBUSER"
+    DB_PW: "$PROD_DBPASS"
+    ReviewFile: "review.publish.xml"
+    ConnectionString: "$REVIEW_CNSTRING"
+    DNS: "$PROD_API_DNS"
+    DNS_SEARCH: "$PROD_API_DNS_SEARCH"
+  only:
+    - review
+  tags:
+    - prod-api01
+
+#############  Deploy Stage - Development Front-End  ################
+.deployfe: &deployfe
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - export IMAGE_TAG=$(echo -en $CI_COMMIT_REF_NAME | tr -c '[:alnum:]_.-' '-')
+    - echo "#Development Environment Variables" > .env
+    - echo "NGINX_PORT=$NGINX_PORT" >> .env
+    - echo "HOST_NAME=$HOST_NAME" >> .env
+    - echo "URL_HOST_NAME=$URL_HOST_NAME" >> .env
+    - echo "API_SERVER=$API_SERVER" >> .env
+    - echo "API_PORT=$API_PORT" >> .env
+    - echo "ImageName=$CI_REGISTRY_IMAGE" >> .env
+    - echo "ImageTag=fe_$IMAGE_TAG$EXTRATAG" >> .env
+    - echo "LETSENCRYPT_EMAIL=$LETSENCRYPT_EMAIL" >> .env
+    - echo "LETSENCRYPT_TEST=$LETSENCRYPT_TEST" >> .env
+    - echo "$Docker_User_Name"
+    - sudo docker login --username "$Docker_User_Name" --password "$Docker_Password" $CI_REGISTRY
+    - sudo docker-compose -f $DOCKER_COMPOSE_FILE pull
+    - sudo docker-compose -f $DOCKER_COMPOSE_FILE --project-name $FULL_PROJECT_NAME up -d --force-recreate
+
+deployfe-dev:linux:
+  <<: *deployfe
+  stage: deploy
+  variables:
+    EXTRATAG: ""
+    NGINX_PORT: "$DEV_NGINX_PORT"
+    HOST_NAME: "$DEV_HOST_NAME"
+    URL_HOST_NAME: "$DEV_HOST_NAME"
+    API_SERVER: "$DEV_API_SERVER"
+    API_PORT: "$DEV_API_PORT"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME"
+    DOCKER_COMPOSE_FILE: "docker-composefe.yml"
+  tags:
+    - linux
+    - shell
+    - test-doc01
+  only:
+    - develop
+
+deployfe-demo:linux:
+  <<: *deployfe
+  stage: deploy
+  environment:
+    name: review-fe/$CI_COMMIT_REF_NAME
+    on_stop: stop_demo
+  variables:
+    EXTRATAG: ""
+    NGINX_PORT: "$DEV_NGINX_PORT"
+    HOST_NAME: "$DEV_HOST_NAME"
+    URL_HOST_NAME: "$CI_COMMIT_REF_NAME-$DEV_HOST_NAME"
+    API_SERVER: "$DEV_API_SERVER"
+    API_PORT: "$CI_PIPELINE_ID"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME"
+    DOCKER_COMPOSE_FILE: "docker-composefe.yml"
+  tags:
+    - linux
+    - shell
+    - test-doc01
+  only:
+    - /^demo.*$/
+    - /^hotfix.*$/
+
+#############  Deploy Stage - SSL  ################
+#If the staging does not want SSL, then deployfe-staging should be uncommented (remove the period) and the deployfe-stagingwithssl should be commented out (add a period)
+deployfe-staging:linux:
+  <<: *deployfe
+  stage: deploy
+  variables:
+    EXTRATAG: ""
+    NGINX_PORT: "$STAGING_NGINX_PORT"
+    HOST_NAME: "$STAGING_HOST_NAME"
+    URL_HOST_NAME: "$STAGING_HOST_NAME"
+    API_SERVER: "$STAGING_API_SERVER"
+    API_PORT: "$STAGING_API_PORT"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME"
+    DOCKER_COMPOSE_FILE: "docker-composefelencrypt.yml"  # For Not using Lets Encrypt SSL: "docker-composefe.yml"
+    LETSENCRYPT_TEST: "false"
+  tags:
+    - staging-doc01
+  only:
+    - staging
+
+deployfe-securityscan:linux:
+  <<: *deployfe
+  stage: deploy
+  environment:
+    name: review-fe/$CI_COMMIT_REF_NAME
+    on_stop: stop_staging
+  variables:
+    EXTRATAG: ""
+    NGINX_PORT: "$STAGING_NGINX_PORT"
+    HOST_NAME: "$STAGING_HOST_NAME"
+    URL_HOST_NAME: "$CI_COMMIT_REF_NAME-$STAGING_HOST_NAME"
+    API_SERVER: "$STAGING_API_SERVER"
+    API_PORT: "$CI_PIPELINE_ID"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME"
+    DOCKER_COMPOSE_FILE: "docker-composefelencrypt.yml"
+    LETSENCRYPT_TEST: "true"
+  tags:
+    - staging-doc01
+  only:
+    - securityscan
+
+deployfe-hotfix:linux:
+  <<: *deployfe
+  stage: deploy
+  environment:
+    name: review-fe/$CI_COMMIT_REF_NAME
+    on_stop: stop_staging
+  variables:
+    EXTRATAG: ""
+    NGINX_PORT: "$STAGING_NGINX_PORT"
+    HOST_NAME: "$PROD_HOST_NAME"
+    URL_HOST_NAME: "$CI_COMMIT_REF_NAME-$STAGING_HOST_NAME"
+    API_SERVER: "$STAGING_API_SERVER"
+    API_PORT: "$CI_PIPELINE_ID"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME"
+    DOCKER_COMPOSE_FILE: "docker-composefelencrypt.yml"
+    LETSENCRYPT_TEST: "true"
+  tags:
+    - staging-doc01
+  only:
+    - /^hotfix.*$/
+
+deployfe-review:linux:
+  <<: *deployfe
+  stage: deploy
+  environment:
+    name: review-fe/$CI_COMMIT_REF_NAME
+    on_stop: stop_review
+  variables:
+    EXTRATAG: ""
+    NGINX_PORT: "$PROD_NGINX_PORT"
+    HOST_NAME: "$PROD_HOST_NAME"
+    URL_HOST_NAME: "$CI_COMMIT_REF_NAME-$PROD_HOST_NAME"
+    API_SERVER: "$PROD_API_SERVER"
+    API_PORT: "$CI_PIPELINE_ID"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME"
+    DOCKER_COMPOSE_FILE: "docker-composefelencrypt.yml"
+    LETSENCRYPT_TEST: "true"
+  tags:
+    - prod-doc01
+  only:
+    - review
+
+deployfe-prod:linux:
+  <<: *deployfe
+  stage: deploy
+  variables:
+    EXTRATAG: "-$CI_PIPELINE_ID"
+    NGINX_PORT: "$PROD_NGINX_PORT"
+    HOST_NAME: "$PROD_HOST_NAME"
+    URL_HOST_NAME: "$PROD_HOST_NAME"
+    API_SERVER: "$PROD_API_SERVER"
+    API_PORT: "$PROD_API_PORT"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE-$CI_PROJECT_NAME"
+    DOCKER_COMPOSE_FILE: "docker-composefelencrypt.yml"  # For Not using Lets Encrypt SSL: "docker-composefe.yml"
+  environment:
+    name: ProductionFE
+  tags:
+    - prod-doc01
+  only:
+    - master
+
+#############  SQL Process - Build with Testserver  ################
+buildsql:
+  variables:
+    ConnectionString: $TEST_CNSTRING
+  stage: build
+  before_script:
+  - powershell "(Get-Content .\src\SQL\testserver.publish.xml).replace('[[connectionstring]]', "${env:ConnectionString}") | Set-content .\src\SQL\testserver.publish.xml"
+  script:
+  - cd src/SQL
+  - '"%ProgramFiles(x86)%%SQLMSBUILDFolder%msbuild.exe" /t:build "%SQLProjFile%" /p:Configuration=Production /m /p:Platform="Any CPU" /p:SqlPublishProfilePath="testserver.publish.xml"'
+  tags:
+  - sqlbuild02
+  only:
+  - develop
+
+#############  SQL Process - Deploy Testserver  ################
+deploysql:
+  variables:
+    ConnectionString: $TEST_CNSTRING
+  stage: deploy
+  before_script:
+  - powershell "(Get-Content .\src\SQL\testserver.publish.xml).replace('[[connectionstring]]', "${env:ConnectionString}") | Set-content .\src\SQL\testserver.publish.xml"
+  script:
+  - cd src/SQL
+  - '"%ProgramFiles(x86)%%SQLMSBUILDFolder%msbuild.exe" /t:build;publish "%SQLProjFile%" /p:Configuration=Production /m /p:Platform="Any CPU" /p:SqlPublishProfilePath="testserver.publish.xml"'
+  tags:
+  - sqlbuild02
+  only:
+  - develop
+
+#############  SQL Process - Deploy S  ################
+deploysql-staging:
+  stage: deploy
+  variables:
+    ConnectionString: $STAGE_CNSTRING
+  environment:
+    name: StagingSQL
+  script:
+  - cd src/SQL
+  - powershell "(Get-Content staging.publish.xml).replace('[[connectionstring]]', "${env:ConnectionString}" ) | Set-Content staging.publish.xml"
+  - '"%ProgramFiles(x86)%%SQLMSBUILDFolder%msbuild.exe" /t:build;publish "%SQLProjFile%" /p:Configuration=Production /m /p:Platform="Any CPU" /p:SqlPublishProfilePath="staging.publish.xml"'
+  tags:
+  - sqlbuild
+  only:
+  - staging
+
+  #############  SQL Process - Deploy Production  ################
+
+deploysql-Production:
+  stage: deploy
+  variables:
+    ConnectionString: $PROD_CNSTRING
+  environment:
+    name: ProductionSQL
+  script:
+  - cd src/SQL
+  - powershell "(Get-Content production.publish.xml).replace('[[connectionstring]]', "${env:ConnectionString}" ) | Set-Content production.publish.xml"
+  - '"%ProgramFiles(x86)%%SQLMSBUILDFolder%msbuild.exe" /t:build;publish "%SQLProjFile%" /p:Configuration=Production /m /p:Platform="Any CPU" /p:SqlPublishProfilePath="production.publish.xml"'
+  tags:
+  - sqlbuild
+  only:
+  - master
+
+#############  Cleanup Processes - For cleaning up servers of extra disk usage  ################
+cleanup-fe:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - ls
+  tags:
+    - linux
+    - shell
+    - test-doc01
+  only:
+    - /^demo.*$/
+    - /^hotfix.*$/
+
+cleanup-api:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - dir
+  only:
+    - /^demo.*$/
+  tags:
+    - test-api01
+    - pshell
+
+cleanup-fe-staging:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - rm -rf
+  tags:
+    - staging-doc01
+  only:
+    - securityscan
+    - /^hotfix.*$/
+
+cleanup-api-staging:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - del *.*
+  only:
+    - securityscan
+    - /^hotfix.*$/
+  tags:
+    - stagingapi01
+
+cleanup-fe-prod:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - rm -rf
+  tags:
+    - prod-doc01
+  only:
+    - review
+    - master
+
+cleanup-api-prod:
+  stage: cleanup
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - del *.*
+  only:
+    - review
+    - master
+  tags:
+    - prod-api01
+
+
+#############  Stop Processes - For when an Environment or Branch is Destroyed  ################
+.stopfe: &stopfe
+  variables:
+    GIT_STRATEGY: none
+    NGIN_SUFFIX: "_ngin_1"
+    FULL_PROJECT_NAME: "$CI_PROJECT_NAMESPACE$CI_PROJECT_NAME$CI_COMMIT_REF_NAME$NGIN_SUFFIX"
+  when: manual
+  environment:
+    name: review-fe/$CI_COMMIT_REF_NAME
+    action: stop
+  allow_failure: true
+  script:
+    - export FNIMAGE=$(echo "$FULL_PROJECT_NAME" | tr '[:upper:]' '[:lower:]')
+    - export IMAGE_TAG=$(echo -en $CI_COMMIT_REF_NAME | tr -c '[:alnum:]_.-' '-')
+    - sudo docker stop $FNIMAGE
+    - sudo docker rm $FNIMAGE
+    - sudo docker rmi $CI_REGISTRY_IMAGE:fe_$IMAGE_TAG
+
+stop_demo:
+  <<: *stopfe
+  stage: deploy
+  only:
+    - demo
+  tags:
+    - linux
+    - shell
+    - test-doc01
+
+stop_staging:
+  <<: *stopfe
+  stage: deploy
+  only:
+    - securityscan
+    - /^hotfix.*$/
+  tags:
+    - staging-doc01
+
+stop_review:
+  <<: *stopfe
+  stage: deploy
+  only:
+    - review
+  tags:
+    - prod-doc01
+
+.stopapi: &stopapi
+  variables:
+    IMAGETAG: "api_$CI_COMMIT_REF_NAME"
+  environment:
+    name: review-api/$CI_COMMIT_REF_NAME
+    action: stop
+  when: manual
+  script:
+    - iex '@(docker ps -a | sls "${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME}") | %{docker stop ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_reviewsql_${env:CI_COMMIT_REF_NAME}}'
+    - iex '@(docker ps -a | sls "${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_api_${env:CI_COMMIT_REF_NAME}") | %{docker stop ${env:CI_PROJECT_NAMESPACE}_${env:CI_PROJECT_NAME}_api_${env:CI_COMMIT_REF_NAME}}'
+    - iex '@(docker images | sls "${env:CI_REGISTRY_IMAGE}:${env:IMAGETAG}") | %{docker rmi ${env:CI_REGISTRY_IMAGE}:${env:IMAGETAG}}'
+
+stop_demo_app:
+  <<: *stopapi
+  stage: deploy
+  only:
+    - demo
+  except:
+    - develop
+    - master
+    - review
+    - staging
+    - securityscan
+    - /^hotfix.*$/
+  tags:
+    - test-api01
+
+stop_staging_app:
+  <<: *stopapi
+  stage: deploy
+  only:
+    - securityscan
+    - /^hotfix.*$/
+  tags:
+    - stagingapi01
+
+stop_review_app:
+  <<: *stopapi
+  stage: deploy
+  only:
+    - review
+  tags:
+    - prod-api01

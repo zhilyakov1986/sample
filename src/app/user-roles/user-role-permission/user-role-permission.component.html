@@ -1,0 +1,29 @@
+<div class="miles-editable miles-card padded" *ngIf="!isEditing && claimType.Id > 0" (mouseenter)="isHovered = true" (mouseleave)="isHovered = false"
+    (click)="edit()" [style.cursor]="role.IsEditable ? 'pointer' : 'default'">
+    <h4>{{claimType.Name}} Access
+        <span class="pull-right" *ngIf="role.IsEditable" [hidden]="!isHovered">
+            <i class="fa fa-lg fa-edit"></i>
+        </span>
+    </h4>
+    <div class="display-padded">
+        <b>Permissions:</b> {{getPermission()}}
+    </div>
+</div>
+<form [formGroup]="permissionSlip" *ngIf="isEditing" class="miles-form padded" (ngSubmit)="save()">
+    <h4>{{claimType.Name}} Access</h4>
+    <div *ngFor="let claim of claimValues">
+        <div class="row">
+            <div class="col-xs-4">
+                <input type="radio" formControlName="ClaimValueId" value="{{claim.Id}}"> {{claim.Name}}
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xs-4">
+            <input type="radio" formControlName="ClaimValueId" value="0"> None
+        </div>
+    </div>
+    <br>
+    <button type="submit" class="btn btn-success btn-flat">Save</button>
+    <button type="default" class="btn btn-default btn-flat" (click)="cancel()">Cancel</button>
+</form>

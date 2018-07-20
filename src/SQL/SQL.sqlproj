@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <Name>SQL</Name>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectVersion>4.1</ProjectVersion>
+    <ProjectGuid>{30ab0f33-a1d8-4aa3-8bfc-d600a8a21d04}</ProjectGuid>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql120DatabaseSchemaProvider</DSP>
+    <OutputType>Database</OutputType>
+    <RootPath>
+    </RootPath>
+    <RootNamespace>training.SQL</RootNamespace>
+    <AssemblyName>training.SQL</AssemblyName>
+    <ModelCollation>1033,CI</ModelCollation>
+    <DefaultFileStructure>BySchemaType</DefaultFileStructure>
+    <DeployToDatabase>True</DeployToDatabase>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <TargetLanguage>CS</TargetLanguage>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <SqlServerVerification>False</SqlServerVerification>
+    <IncludeCompositeObjects>True</IncludeCompositeObjects>
+    <TargetDatabaseSet>True</TargetDatabaseSet>
+    <DefaultCollation>SQL_Latin1_General_CP1_CI_AS</DefaultCollation>
+    <DefaultFilegroup>PRIMARY</DefaultFilegroup>
+    <DacApplicationName>training</DacApplicationName>
+    <Recovery>SIMPLE</Recovery>
+    <TargetDatabase>training.SQL</TargetDatabase>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release\</OutputPath>
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <DefineDebug>false</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <SqlTargetName>training</SqlTargetName>
+  </PropertyGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
+    <!-- Default to the v11.0 targets path if the targets file for the current VS version is not found -->
+    <SSDTExists Condition="Exists('$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets')">True</SSDTExists>
+    <VisualStudioVersion Condition="'$(SSDTExists)' == ''">11.0</VisualStudioVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Production|AnyCPU' ">
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <SqlTargetName>training.Sql</SqlTargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Testing|AnyCPU' ">
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <SqlTargetName>training.Sql</SqlTargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Staging|AnyCPU' ">
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <SqlTargetName>training.Sql</SqlTargetName>
+    <OutputPath>bin\output</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Review|AnyCPU' ">
+    <OutputPath>bin\Debug\</OutputPath>
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <SqlTargetName>training.Sql</SqlTargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Security|AnyCPU' ">
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <SqlTargetName>training.Sql</SqlTargetName>
+  </PropertyGroup>
+  <Import Condition="'$(SQLDBExtensionsRefPath)' != ''" Project="$(SQLDBExtensionsRefPath)\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
+  <Import Condition="'$(SQLDBExtensionsRefPath)' == ''" Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
+  <ItemGroup>
+    <Folder Include="Properties" />
+    <Folder Include="Tables\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Build Include="Tables\Addresses.sql" />
+    <Build Include="Tables\AuditLogDetails.sql" />
+    <Build Include="Tables\AuditLogs.sql" />
+    <Build Include="Tables\States.sql" />
+    <Build Include="Tables\AuthTokens.sql" />
+    <Build Include="Tables\AuthClients.sql" />
+    <Build Include="Tables\AuthApplicationTypes.sql" />
+    <Build Include="Tables\AuthUsers.sql" />
+    <Build Include="Tables\Images.sql" />
+    <Build Include="Tables\UserRoles.sql" />
+    <Build Include="Tables\Documents.sql" />
+    <Build Include="Tables\PhoneTypes.sql" />
+    <Build Include="Tables\ContactPhones.sql" />
+    <Build Include="Tables\ContactStatuses.sql" />
+    <Build Include="Tables\ClaimValues.sql" />
+    <Build Include="Tables\UserRoleClaims.sql" />
+    <Build Include="Tables\ClaimTypes.sql" />
+    <Build Include="Tables\Settings.sql" />
+    <Build Include="Tables\CustomerStatuses.sql" />
+    <Build Include="Tables\Customers.sql" />
+    <Build Include="Tables\CustomerAddresses.sql" />
+    <Build Include="Tables\Users.sql" />
+    <Build Include="Tables\UserDocuments.sql" />
+    <Build Include="Tables\UserPhones.sql" />
+    <Build Include="Tables\Notes.sql" />
+    <Build Include="Tables\CustomerSources.sql" />
+    <Build Include="Tables\CustomerPhones.sql" />
+    <Build Include="Tables\CustomerDocuments.sql" />
+    <Build Include="Tables\CustomerNotes.sql" />
+    <Build Include="Tables\CustomerContacts.sql" />
+    <Build Include="Tables\Contacts.sql" />
+    <Build Include="Tables\Countries.sql" />
+    <Build Include="Tables\ServiceDivisions.sql" />
+    <Build Include="Tables\ServiceAreas.sql" />
+    <Build Include="Tables\UnitTypes.sql" />
+    <Build Include="Tables\ServiceTypes.sql" />
+    <Build Include="Tables\SubcontractorStatuses.sql" />
+    <Build Include="Tables\WorkOrderStatuses.sql" />
+    <Build Include="Tables\ContractStatuses.sql" />
+    <Build Include="Tables\Goods.sql" />
+    <Build Include="Tables\GoodDocuments.sql" />
+    <Build Include="Tables\CustomerLocations.sql" />
+    <Build Include="Tables\CustomerLocationDocuments.sql" />
+    <Build Include="Tables\CustomerLocationAddresses.sql" />
+    <Build Include="Tables\Contracts.sql" />
+    <Build Include="Tables\ContractServiceAreas.sql" />
+    <Build Include="Tables\LocationServices.sql" />
+    <Build Include="Tables\UserServiceAreas.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <PostDeploy Include="Script.PostDeployment.TableValues.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <RefactorLog Include="SQL.refactorlog" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="SQL.Dev.publish.xml" />
+    <None Include="testserver.publish.xml" />
+    <None Include="staging.publish.xml" />
+    <None Include="IncludeDummyData.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <SqlCmdVariable Include="AllowAdminDirectLogin">
+      <DefaultValue>False</DefaultValue>
+      <Value>$(SqlCmdVar__2)</Value>
+    </SqlCmdVariable>
+    <SqlCmdVariable Include="IncludeDummyData">
+      <DefaultValue>False</DefaultValue>
+      <Value>$(SqlCmdVar__1)</Value>
+    </SqlCmdVariable>
+  </ItemGroup>
+</Project>

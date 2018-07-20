@@ -1,0 +1,152 @@
+﻿{"base": [
+      {
+        "name": "Entity",
+         "properties": [
+          {
+              "name": "Id",
+              "type": "int"
+          }
+        ]
+      },
+      {
+        "name": "MetaItem",
+        "extends": ["Entity"],
+         "properties": [
+          {
+              "name": "Name",
+              "type": "string"
+          }
+        ]
+      },
+      {
+        "name": "Versionable",
+         "properties": [
+          {
+              "name": "Version",
+              "type": "number[]"
+          }
+        ]
+      },
+      {
+        "name": "Document",
+        "extends": ["Entity"],
+        "properties": [
+          {
+              "name": "Name",
+              "type": "string"
+          },
+          {
+              "name": "DateUpload",
+              "type": "Date"
+          },
+          {
+              "name": "UploadedBy",
+              "type": "number",
+              "nullable": "true"
+          },
+          {
+              "name": "FilePath",
+              "type": "string"
+          }
+        ]
+      },
+      {
+        "name": "Note",
+        "extends": ["Entity"],
+        "properties": [
+          {
+              "name": "Title",
+              "type": "string"
+          },
+          {
+              "name": "NoteText",
+              "type": "string"
+          }
+        ]
+      },
+      {
+        "name": "Phone",
+        "extends": [],
+        "properties": [
+          {
+              "name": "Phone",
+              "type": "string"
+          },
+          {
+              "name": "Extension",
+              "type": "string"
+          },
+          {
+              "name": "PhoneTypeId",
+              "type": "number"
+          },
+          {
+              "name": "IsPrimary",
+              "type": "boolean"
+          }
+        ]
+      },
+      {
+        "name": "PhoneType",
+        "extends": ["Entity"],
+         "properties": [
+          {
+              "name": "Name",
+              "type": "string"
+          }
+        ]
+      },
+      {
+        "name": "Address",
+        "extends": ["Entity"],
+        "properties": [
+            {
+                "name": "Address1",
+                "type": "string"
+            },
+            {
+                "name": "Address2",
+                "type": "string"
+            },
+            {
+                "name": "City",
+                "type": "string"
+            },
+            {
+                "name": "StateCode",
+                "type": "string"
+            },
+            {
+                "name": "Zip",
+                "type": "string"
+            },
+            {
+                "name": "CountryCode",
+                "type": "string"
+            },
+            {
+                "name": "Province",
+                "type": "string"
+            }
+        ]
+      },
+      {
+        "name": "AddressContainer",
+        "extends": [],
+        "properties": [
+          {
+              "name": "AddressId",
+              "type": "int"
+          },
+          {
+              "name": "Address",
+              "type": "IAddress"
+          },
+          {
+              "name": "IsPrimary",
+              "type": "boolean"
+          }
+        ]
+      }
+    ]
+}

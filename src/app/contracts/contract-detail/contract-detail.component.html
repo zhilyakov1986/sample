@@ -1,0 +1,18 @@
+<div *ngIf="contract && contract.Id > 0">
+  <div class="row">
+    <div class="col-md-6">
+      <app-contract-basic-info [contract]="contract" [canEdit]="canEdit"></app-contract-basic-info>
+      <br>
+    </div>
+    <div class="col-md-6">
+    </div>
+  </div>
+  <a routerLink="/contracts" class="btn btn-default">Close</a>
+</div>
+<div *ngIf="contract && contract.Id === 0">
+  <div class="row">
+    <div class="col-md-6">
+      <app-contract-basic-info [contract]="contract" [canEdit]="canEdit"></app-contract-basic-info>
+    </div>
+  </div>
+</div>

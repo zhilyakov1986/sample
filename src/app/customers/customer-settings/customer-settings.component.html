@@ -1,0 +1,18 @@
+<h2>Customer Settings</h2>
+<div>
+  <div class="row">
+    <div class="col-md-6">
+
+      <mt-managed-list componentTitle="Customer Sources"
+        [dynamicForm]="customerSourceDynamicForm" [items]="customerSources" 
+        (onSave)="saveCustomerSources($event)" [canAdd]="true" [canRemove]="true"></mt-managed-list>
+
+    </div>
+
+    <div class="col-md-6">
+
+    </div>
+  </div>
+</div>
+<br/>
+<a routerLink="./customers" class="btn btn-default btn-flat">Close</a>

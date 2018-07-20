@@ -1,0 +1,25 @@
+<div *ngIf="customerLocation && customerLocation.Id > 0">
+  <div class="row">
+    <div class="col-md-6">
+      <app-customer-location-basic-info [customerLocation]="customerLocation" [canEdit]="canEdit"></app-customer-location-basic-info><br> 
+      <app-common-addresses 
+      [address]="customerLocationAddress"
+      [canEdit]="canEdit"
+      [canAdd]="canEdit" 
+      (onSave)="saveAddress($event)" 
+      (onDelete)="deleteAddress($event)">
+    </app-common-addresses><br>
+    </div>
+    <div class="col-md-6">
+      <app-common-documents [canEdit]="canEdit"></app-common-documents><br>
+    </div>
+  </div>
+  <a routerLink="/customerlocations" class="btn btn-default">Close</a>
+</div>
+<div *ngIf="customerLocation && customerLocation.Id === 0">
+  <div class="row">
+    <div class="col-md-6">
+      <app-customer-location-basic-info [customerLocation]="customerLocation"></app-customer-location-basic-info>
+    </div>
+  </div>
+</div>

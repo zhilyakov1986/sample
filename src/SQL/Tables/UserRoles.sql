@@ -1,0 +1,7 @@
+﻿CREATE TABLE [dbo].[UserRoles]
+(
+	[Id] INT NOT NULL PRIMARY KEY IDENTITY, 
+    [Name] VARCHAR(50) NOT NULL, 
+    [Description] VARCHAR(500) NOT NULL DEFAULT '', 
+    [IsEditable] BIT NOT NULL DEFAULT 1
+)

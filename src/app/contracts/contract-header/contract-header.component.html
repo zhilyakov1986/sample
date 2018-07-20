@@ -1,0 +1,53 @@
+<ngb-tabset #t="ngbTabset">
+  <ngb-tab id="tab-selectbyid1">
+    <ng-template ngbTabTitle>
+      <b>Contracts</b>
+    </ng-template>
+    <ng-template ngbTabContent>
+      <div class="row ">
+        <div class="col-md-6">
+          <br>
+          <nav *ngIf="addActionStatusBar" class="navbar navbar-light bg-light">
+            <span class="navbar-text">
+              Select to change the order status:
+            </span>
+            <form class="form-inline">
+              <button *ngIf="showApproved" class="btn btn-outline-success" (click)="toApproved()" type="button">Approved</button>
+              <button *ngIf="showCanceled" class="btn btn-outline-success" (click)="toCanceled()" type="button">Canceled</button>
+              <button *ngIf="showExpired" class="btn btn-outline-success" (click)="toExpired()" type="button">Expired</button>
+              <button *ngIf="showPending" class="btn btn-outline-success" (click)="toPending()" type="button">Pending</button>
+            </form>
+          </nav>
+        </div>
+        <div class="col-md-6"></div>
+      </div>
+      <div>
+        <div class="row">
+          <div class="col-md-7">
+            <h2>{{header}}
+              <span class="label label-default">{{statusName}}</span>
+            </h2>
+          </div>
+        </div>
+      </div>
+      <router-outlet></router-outlet>
+    </ng-template>
+  </ngb-tab>
+  <ngb-tab id="tab-selectbyid3">
+    <ng-template ngbTabTitle>
+      <span class="fa fa-plus"></span>
+      <b>Add Locations/Services</b>
+    </ng-template>
+    <ng-template ngbTabContent>
+      <app-location-service-detail [contract]="contract"></app-location-service-detail>
+    </ng-template>
+  </ngb-tab>
+  <ngb-tab id="tab-selectbyid2">
+    <ng-template ngbTabTitle>
+      <b>Locations/Services</b>
+    </ng-template>
+    <ng-template ngbTabContent>
+      <app-location-services></app-location-services>
+    </ng-template>
+  </ngb-tab>
+</ngb-tabset>

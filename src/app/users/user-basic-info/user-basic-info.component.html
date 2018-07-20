@@ -1,0 +1,45 @@
+<div class="miles-editable miles-card padded" *ngIf="!isEditing && user.Id > 0" (mouseenter)="isHovered = true" (mouseleave)="isHovered = false"
+  (click)="edit()" [style.cursor]="canEdit ? 'pointer' : 'default'">
+  <h4>User Info
+    <span class="pull-right" *ngIf="canEdit" [hidden]="!isHovered">
+      <i class="fa fa-lg fa-edit"></i>
+    </span>
+  </h4>
+  <app-dynamic-view [config]="config.viewOnly"></app-dynamic-view>
+</div>
+<div *ngIf="isEditing" class="miles-form padded">
+  <h4>User Info</h4>
+  <app-dynamic-form [config]="config.formObject" ([isEditing])="isEditing" (submitted)="formSubmitted($event)">
+    <button type="submit" mt-doubleClickDisabled [(doubleClickIsDisabled)]="doubleClickIsDisabled" Class="btn btn-flat btn-success">
+      Save
+    </button>
+    <button type="button" Class="btn btn-flat btn-default" (click)="cancelClick()">
+      Cancel
+    </button>
+  </app-dynamic-form>
+  
+  <!-- <div class="dynamic-field form-select ng-pristine ng-valid ng-touched" ng-reflect-form="[object Object]" style="margin-bottom: 15px;">
+    <span>
+      <span class="dynamic-field-label">
+        <label>Service Areas</label>
+      </span>
+    </span>
+    <select class="form-control ng-pristine ng-valid ng-touched" multiple="" ng-reflect-name="ServiceAreas">
+      <option ng-reflect-ng-value="1" value="0: 1">
+        East
+      </option>
+      <option ng-reflect-ng-value="3" value="1: 3">
+        Mid-West
+      </option>
+      <option ng-reflect-ng-value="5" value="2: 5">
+        North
+      </option>
+      <option ng-reflect-ng-value="4" value="3: 4">
+        South
+      </option>
+      <option ng-reflect-ng-value="2" value="4: 2">
+        West
+      </option>
+    </select>
+  </div> -->
+</div>

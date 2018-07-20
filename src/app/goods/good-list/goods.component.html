@@ -1,0 +1,21 @@
+<div class="row">
+  <div class="col-md-7">
+    <h2>Services</h2>
+  </div>
+</div>
+<div>
+  <mt-search-bar (onSearch)="search($event)"></mt-search-bar>
+  <mt-search-filter-select [items]="servicetypes" entity="ServiceType" (onSelectionChanged)="getGoods()"></mt-search-filter-select>
+  <mt-search-filter-select [items]="serviceDivisions" entity="DivisionService" (onSelectionChanged)="getGoods()"></mt-search-filter-select>
+  <input type="checkbox" [(ngModel)]="includeArchived" id="includeArchived" (change)="includeArchivedChanged()" class="form-check-input"> <label for="archived">Include Archived</label>
+ 
+</div>
+<entity-list [entities]="goods" entityLink="/goods" [total]="total" [(currentPage)]="currentPage"
+    (onPageChanged)="getGoods()" [entityListConfig]="entityListConfig" (onItemSelected) = "goodSelected($event)">
+</entity-list>
+
+<div *ngIf="canAddGood" class="fab-wrap-b-r">
+  <a class="btn btn-primary btn-fab-lg" [routerLink]="['/goods', 'add']">
+    <span class="fa fa-plus"></span>
+  </a>
+</div>

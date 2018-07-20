@@ -1,0 +1,40 @@
+<div class="row">
+  <div class="col-md-7">
+    <h2>LocationServices</h2>
+  </div>
+</div>
+<div>
+  <div class="row">
+    <div class="col-md-3">
+      <h3>By Service Name</h3>
+      <mt-search-bar (onSearch)="searchGood($event)"></mt-search-bar>
+      <h3>By Location Name</h3>
+      <mt-search-bar (onSearch)="searchLocation($event)"></mt-search-bar>
+      <mt-search-filter-select [items]="servicetypes" entity="ServiceType" (onSelectionChanged)="getLocationServices()"></mt-search-filter-select>
+      <input type="checkbox" [(ngModel)]="includeArchived" id="includeArchived" (change)="includeArchivedChanged()" class="form-check-input">
+      <label for="archived">Include Archived</label>
+    </div>
+    <div class="col-md-3">
+      <h3>By City</h3>
+      <mt-search-bar (onSearch)="searchCity($event)"></mt-search-bar>
+      <h3>By State</h3>
+      <mt-search-bar (onSearch)="searchState($event)"></mt-search-bar>
+    </div>
+    <div class="col-md-3">
+      <h3>By Zip</h3>
+      <mt-search-bar (onSearch)="searchZip($event)"></mt-search-bar>
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col-md-8">
+    <entity-list [entities]="locationServices" entityLink="/locationServices" [total]="total" [(currentPage)]="currentPage" (onPageChanged)="getLocationServices()"
+      [entityListConfig]="entityListConfig" (onItemSelected)="locationServiceSelected($event)">
+    </entity-list>
+  </div>
+  <div class="col-md-2">
+    <h2>Location Selected: <em class="red">{{selectedLocationName}}</em></h2>
+    <h1>Total: {{selectedLocationTotal | currency}}</h1>
+    <button *ngIf="LocationSelected" (click)="toggleArchiveStatus()">Toggle Archive</button>
+  </div>
+</div>
